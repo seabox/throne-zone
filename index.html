@@ -1,14 +1,182 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Throne Zone</title>
-  </head>
-  <body>
-    <main>
-      <h1>Throne Zone</h1>
-      <p>A simple movement tracking app to help decide what to do next.</p>
-    </main>
-  </body>
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Throne Zone</title>
+<style>
+:root{--bg:#f6f0ff;--card:#fff;--ink:#2b1d4a;--mute:#6f6490;--pri:#6b3fc4;--onpri:#fff;--gold:#c99100;--line:#e2d8f5;--soft:#efe6ff;--warn:#fff1d6;--warnink:#7a4b00;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#171027;--card:#241a3b;--ink:#f1eaff;--mute:#a99dcc;--pri:#9c7bf0;--onpri:#171027;--gold:#f2c230;--line:#3a2d5c;--soft:#30244d;--warn:#4a3510;--warnink:#ffd98a}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#171027;--card:#241a3b;--ink:#f1eaff;--mute:#a99dcc;--pri:#9c7bf0;--onpri:#171027;--gold:#f2c230;--line:#3a2d5c;--soft:#30244d;--warn:#4a3510;--warnink:#ffd98a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:14px}
+h1{margin:4px 0 12px;text-align:center;font-size:26px}
+#crown{cursor:pointer;display:inline-block;user-select:none}
+#crown.wig{animation:wig .5s}
+@keyframes wig{25%{transform:rotate(-20deg) scale(1.3)}75%{transform:rotate(20deg) scale(1.3)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.big{font-size:22px;font-weight:700}
+.sub{color:var(--mute);font-size:14px}
+.rank{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:8px 10px;background:var(--soft);border-radius:10px;font-weight:600}
+.warn{background:var(--warn);color:var(--warnink);border-color:transparent}
+.week{display:flex;justify-content:space-between;margin-top:10px}
+.day{text-align:center;font-size:12px;color:var(--mute);flex:1}
+.day b{display:block;font-size:22px;line-height:1.3;font-weight:400}
+.seg{display:flex;gap:8px;margin:6px 0 12px}
+.seg button{flex:1;padding:12px 6px;border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;font:inherit;cursor:pointer}
+.seg button.on{border-color:var(--pri);background:var(--soft);font-weight:700}
+label{font-size:13px;color:var(--mute);display:block}
+input,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;margin:4px 0 12px}
+#consSeg{gap:5px}#consSeg button{font-size:13px;padding:12px 0}
+.save{width:100%;padding:14px;border:0;border-radius:12px;background:var(--pri);color:var(--onpri);font:700 17px inherit;cursor:pointer}
+.row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .ic{font-size:22px}.row .t{flex:1}
+.row .x{background:none;border:0;color:var(--mute);font-size:18px;cursor:pointer}
+.link{background:none;border:0;color:var(--pri);font:inherit;text-decoration:underline;cursor:pointer;padding:4px}
+</style>
+</head>
+<body>
+<main>
+<h1><span id="crown" title="Royal crown">👑</span> Throne Zone</h1>
+
+<div class="card">
+  <label>What happened?</label>
+  <div class="seg" id="typeSeg">
+    <button data-v="poo" class="on">💩 Pooped</button>
+    <button data-v="mov">💊 Movicol</button>
+  </div>
+  <div id="consWrap">
+    <label>Consistency</label>
+    <div class="seg" id="consSeg">
+      <button data-v="sloppy">Sloppy</button>
+      <button data-v="soft">Soft</button>
+      <button data-v="easy" class="on">Easy</button>
+      <button data-v="firm">Firm</button>
+      <button data-v="hard">Hard</button>
+    </div>
+  </div>
+  <label for="when">Date and time</label>
+  <input type="datetime-local" id="when">
+  <label for="note">Notes</label>
+  <textarea id="note" rows="2" placeholder="Optional"></textarea>
+  <button class="save" id="save">Save</button>
+</div>
+
+<div class="card" id="status"></div>
+
+<div class="card">
+  <div class="big" style="font-size:17px">History</div>
+  <div id="list"></div>
+  <div style="text-align:center;margin-top:8px"><button class="link" id="exp">Export backup</button></div>
+</div>
+</main>
+
+<script>
+const KEY='throneZone.v1';
+let entries=[],type='poo',cons='easy';
+try{entries=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){entries=[]}
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(entries))}catch(e){}};
+const $=id=>document.getElementById(id);
+
+/* ---- sounds ---- */
+let ac;
+const ctx=()=>{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();return ac};
+function trumpet(){
+  try{const a=ctx(),t0=a.currentTime;
+  [[392,0],[523,.18],[659,.36],[784,.54]].forEach(([f,d],i)=>{
+    const o=a.createOscillator(),g=a.createGain(),lp=a.createBiquadFilter();
+    o.type='sawtooth';o.frequency.value=f;lp.type='lowpass';lp.frequency.value=1800;
+    const len=i===3?.7:.16;
+    g.gain.setValueAtTime(0,t0+d);g.gain.linearRampToValueAtTime(.25,t0+d+.03);
+    g.gain.exponentialRampToValueAtTime(.001,t0+d+len);
+    o.connect(lp);lp.connect(g);g.connect(a.destination);o.start(t0+d);o.stop(t0+d+len+.05)})}catch(e){}
+}
+function toot(){
+  try{const a=ctx(),t=a.currentTime,o=a.createOscillator(),l=a.createOscillator(),lg=a.createGain(),g=a.createGain();
+  o.type='sawtooth';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(60,t+.7);
+  l.frequency.value=38;lg.gain.value=22;l.connect(lg);lg.connect(o.frequency);
+  g.gain.setValueAtTime(.3,t);g.gain.exponentialRampToValueAtTime(.001,t+.8);
+  o.connect(g);g.connect(a.destination);o.start(t);l.start(t);o.stop(t+.85);l.stop(t+.85)}catch(e){}
+}
+let taps=0,tapT;
+$('crown').onclick=e=>{
+  taps++;clearTimeout(tapT);tapT=setTimeout(()=>taps=0,1500);
+  if(taps>=5){taps=0;toot();const c=$('crown');c.classList.remove('wig');void c.offsetWidth;c.classList.add('wig')}
+};
+
+/* ---- helpers ---- */
+const dayKey=ts=>{const d=new Date(ts);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()};
+const fmt=ts=>new Date(ts).toLocaleString('en-AU',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+const localInput=ts=>{const d=new Date(ts-new Date(ts).getTimezoneOffset()*60000);return d.toISOString().slice(0,16)};
+function ago(ts){
+  const m=Math.round((Date.now()-ts)/60000);
+  if(m<1)return 'just now';if(m<60)return m+' min ago';
+  const h=Math.floor(m/60);if(h<24)return h+(h===1?' hour':' hours')+' ago';
+  const days=Math.floor((startOfDay(Date.now())-startOfDay(ts))/864e5);
+  return days+(days===1?' day':' days')+' ago';
+}
+const startOfDay=ts=>{const d=new Date(ts);d.setHours(0,0,0,0);return d.getTime()};
+const RANKS=[[0,'Peasant','🧑‍🌾'],[1,'Page','📜'],[2,'Squire','🛡️'],[3,'Knight','⚔️'],[5,'Duke','🏰'],[7,'Royal Highness','👑']];
+function streakInfo(){
+  const days=new Set(entries.filter(e=>e.type==='poo').map(e=>dayKey(e.ts)));
+  let d=new Date();d.setHours(0,0,0,0);
+  if(!days.has(dayKey(d)))d.setDate(d.getDate()-1);
+  let n=0;while(days.has(dayKey(d))){n++;d.setDate(d.getDate()-1)}
+  return {n,days};
+}
+
+/* ---- render ---- */
+function render(){
+  const poos=entries.filter(e=>e.type==='poo').sort((a,b)=>b.ts-a.ts);
+  const {n,days}=streakInfo();
+  const rk=[...RANKS].reverse().find(r=>n>=r[0]);
+  const last=poos[0];
+  const gap=last?Math.floor((startOfDay(Date.now())-startOfDay(last.ts))/864e5):null;
+  let h=last
+    ?`<div class="sub">Last poo</div><div class="big">${ago(last.ts)}</div><div class="sub">${fmt(last.ts)}</div>`
+    :`<div class="sub">Last poo</div><div class="big">None logged yet</div>`;
+  h+=`<div class="rank"><span>${rk[2]} ${rk[1]}</span><span>🔥 ${n} day${n===1?'':'s'} streak</span></div>`;
+  let wk='';
+  for(let i=6;i>=0;i--){
+    const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);
+    const k=dayKey(d),p=days.has(k),m=entries.some(e=>e.type==='mov'&&dayKey(e.ts)===k);
+    wk+=`<div class="day"><b>${p?'💩':m?'💊':'·'}</b>${d.toLocaleDateString('en-AU',{weekday:'short'}).slice(0,3)}</div>`;
+  }
+  h+=`<div class="week">${wk}</div>`;
+  $('status').className='card'+(gap!==null&&gap>=3?' warn':'');
+  $('status').innerHTML=h;
+  const all=[...entries].sort((a,b)=>b.ts-a.ts);
+  $('list').innerHTML=all.length?all.map(e=>`<div class="row"><span class="ic">${e.type==='poo'?'💩':'💊'}</span><div class="t"><div>${fmt(e.ts)}${e.type==='poo'?' · '+e.cons:' · Movicol'}</div>${e.note?`<div class="sub">${esc(e.note)}</div>`:''}</div>${pend===e.id?`<span><button class="link" data-yes="${e.id}">Delete</button><button class="link" data-no="1">Cancel</button></span>`:`<button class="x" data-id="${e.id}" aria-label="Delete">✕</button>`}</div>`).join(''):'<div class="sub" style="padding-top:8px">Nothing logged yet.</div>';
+}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---- events ---- */
+function seg(id,cb){$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));cb(b.dataset.v)}}
+seg('typeSeg',v=>{type=v;$('consWrap').style.display=v==='poo'?'':'none'});
+seg('consSeg',v=>cons=v);
+$('when').value=localInput(Date.now());
+$('save').onclick=()=>{
+  const ts=new Date($('when').value).getTime()||Date.now();
+  entries.push({id:Date.now()+''+Math.floor(Math.random()*1000),ts,type,cons:type==='poo'?cons:null,note:$('note').value.trim()});
+  persist();
+  if(type==='poo')trumpet();
+  $('note').value='';$('when').value=localInput(Date.now());
+  render();
+};
+let pend=null;
+$('list').onclick=e=>{const t=e.target;
+  if(t.dataset.yes){entries=entries.filter(x=>x.id!==t.dataset.yes);pend=null;persist();render();return}
+  if(t.dataset.no){pend=null;render();return}
+  const b=t.closest('.x');if(b){pend=b.dataset.id;render()}};
+$('exp').onclick=()=>{
+  const blob=new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='throne-zone-backup.json';a.click();
+};
+render();
+setInterval(render,60000);
+</script>
+</body>
 </html>
